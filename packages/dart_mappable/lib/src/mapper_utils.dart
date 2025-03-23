@@ -4,7 +4,7 @@ import 'mapper_exception.dart';
 import 'mappers/mapping_context.dart';
 
 extension DecodingUtil on DecodingContext {
-  T $dec<T>(
+  T $dec<T, C>(
     Object? value,
     String key, [
     MappingHook? hook,
@@ -19,7 +19,7 @@ extension DecodingUtil on DecodingContext {
         throw MapperException.missingParameter(key);
       }
 
-      value = container.fromValue<T>(value, options);
+      value = container.fromClassValue<C, T>(value, options);
 
       if (hook != null) {
         value = hook.afterDecode(value);
@@ -36,7 +36,7 @@ extension DecodingUtil on DecodingContext {
 }
 
 extension EncodingUtil on EncodingContext {
-  dynamic $enc<T>(
+  dynamic $enc<T, C>(
     Object? value,
     String key, [
     EncodingOptions? options,
@@ -47,7 +47,7 @@ extension EncodingUtil on EncodingContext {
         value = hook.beforeEncode(value);
       }
       if (value != null && value is T) {
-        value = container.toValue<T>(value as T, options);
+        value = container.toClassValue<T, C>(value as T, options);
       }
       if (hook != null) {
         value = hook.afterEncode(value);

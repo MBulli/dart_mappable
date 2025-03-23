@@ -67,11 +67,11 @@ class Field<T extends Object, V> {
       options = options?.copyWith(data: data) ?? EncodingOptions(data: data);
     }
     if (arg == null) {
-      return context.$enc<V>(get(value), name, options, hook);
+      return context.$enc<V, T>(get(value), name, options, hook);
     } else {
       return context.callWith(
         arg!,
-        <U>() => context.$enc<U>(get(value), name, options, hook),
+        <U>() => context.$enc<U, T>(get(value), name, options, hook),
       );
     }
   }
@@ -82,8 +82,8 @@ class Field<T extends Object, V> {
       options = DecodingOptions(data: data);
     }
     var result = opt || def != null
-        ? context.$dec<R?>(value[key], key, hook, options)
-        : context.$dec<R>(value[key], key, hook, options);
+        ? context.$dec<R?, T>(value[key], key, hook, options)
+        : context.$dec<R, T>(value[key], key, hook, options);
     return result ?? (def as R);
   }
 }

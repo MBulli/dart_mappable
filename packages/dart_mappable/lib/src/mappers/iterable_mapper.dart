@@ -84,7 +84,7 @@ class _IterableDecoder<I extends Iterable> {
 
   Iterable<T> _decode<T>() {
     return mapper.fromIterable(value.map((v) {
-      return context.$dec<T>(v, 'item');
+      return context.$dec<T, Object>(v, 'item');
     }));
   }
 }
@@ -102,7 +102,7 @@ class _IterableEncoder<I extends Iterable> {
 
   Iterable<dynamic> _encode<T>() {
     return value
-        .map((v) => context.$enc<T>(v as T, 'item', context.options))
+        .map((v) => context.$enc<T, Object>(v as T, 'item', context.options))
         .toList();
   }
 }

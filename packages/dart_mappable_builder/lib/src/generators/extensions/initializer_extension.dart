@@ -36,6 +36,12 @@ extension InitializerExtension<T extends TargetClassMapperElement>
       output.write('      MapperContainer.globals.useAll($customMappers);\n');
     }
 
+    var classLocalMappers = element.classLocalMappers;
+    if (classLocalMappers != null) {
+      output.write(
+          '      MapperContainer.globals.useAllForClass<${element.prefixedClassName}>($classLocalMappers);\n');
+    }
+
     var linked = element.linkedElements;
     if (linked.isNotEmpty) {
       for (var l in linked) {

@@ -127,11 +127,16 @@ abstract class MapperContainer {
   /// The core method to decode any value to a given type [T].
   T fromValue<T>(Object? value, [DecodingOptions? options]);
 
+  TResult fromClassValue<TClass, TResult>(Object? value,
+      [DecodingOptions? options]);
+
   /// The core method to encode any value.
   ///
   /// The value is expected to be of type [T]. When the exact type of the value
   /// is different, a type identifier may be added to the resulting encoded value.
   dynamic toValue<T>(T? value, [EncodingOptions? options]);
+
+  dynamic toClassValue<T, C>(T? value, [EncodingOptions? options]);
 
   /// Decodes a map to a given type [T].
   ///
@@ -174,6 +179,10 @@ abstract class MapperContainer {
 
   /// Adds a new mapper to the set of mappers this container holds.
   void use<T extends Object>(MapperBase<T> mapper);
+
+  void useForClass<C extends Object, T extends Object>(MapperBase<T> mapper);
+
+  void useAllForClass<C extends Object>(Iterable<MapperBase> mappers);
 
   /// Removes the mapper for type [T] this container currently holds.
   MapperBase<T>? unuse<T extends Object>();
@@ -232,6 +241,8 @@ class _MapperContainerBase implements MapperContainer, TypeProvider {
 
   final Map<Type, MapperBase?> _cachedMappers = {};
   final Map<Type, MapperBase?> _cachedTypeMappers = {};
+
+  final Map<Type, Map<Type, MapperBase>> _mappersForClasses = {};
 
   void _invalidateCachedMappers([Set<MapperContainer>? invalidated]) {
     // for avoiding hanging on circular links
@@ -323,6 +334,51 @@ class _MapperContainerBase implements MapperContainer, TypeProvider {
     return mapper;
   }
 
+  MapperBase? _mapperForClassType(Type type, Type clazz) {
+    var baseType = type.base;
+    if (baseType == UnresolvedType) {
+      baseType = type;
+    }
+
+    var mapper = _mappersForClasses[clazz]?[baseType] ??
+        _mappersForClasses[clazz]
+            ?.values
+            .where((m) => m.isForType(type))
+            .firstOrNull;
+
+    mapper ??= _mapperForType(type);
+
+    return mapper;
+  }
+
+  MapperBase? _mapperForClass(dynamic value, Type clazz) {
+    var type = value.runtimeType;
+
+    var baseType = type.base;
+    if (baseType == UnresolvedType) {
+      baseType = type;
+    }
+
+    var mapper = //
+        // direct type
+        _mappersForClasses[clazz]?[baseType] ??
+            // indirect type ie. subtype
+            _mappersForClasses[clazz]
+                ?.values
+                .where((m) => m.isFor(value))
+                .firstOrNull;
+
+    if (mapper != null) {
+      if (mapper is ClassMapperBase) {
+        mapper = mapper.subOrSelfFor(value) ?? mapper;
+      }
+    } else {
+      mapper = _mapperFor(value);
+    }
+
+    return mapper;
+  }
+
   @override
   Function? getFactoryById(String id) {
     return _mappers.values.where((m) => m.id == id).firstOrNull?.typeFactory ??
@@ -382,9 +438,65 @@ class _MapperContainerBase implements MapperContainer, TypeProvider {
   }
 
   @override
+  TResult fromClassValue<TClass, TResult>(Object? value,
+      [DecodingOptions? options]) {
+    if (TClass == Object) {
+      return fromValue(value, options);
+    }
+
+    if (value == null) {
+      if (value is TResult) {
+        return value;
+      } else {
+        throw MapperException.chain(MapperMethod.decode, '($TResult)',
+            MapperException.unexpectedType(Null, 'Object'));
+      }
+    }
+
+    var type = options?.type ?? TResult;
+    if (value is Map<String, dynamic> &&
+        value[MapperContainer.typeIdKey] != null) {
+      type = TypePlus.fromId(value[MapperContainer.typeIdKey] as String);
+      if (type == UnresolvedType) {
+        var e = MapperException.unresolvedType(
+            value[MapperContainer.typeIdKey] as String);
+        throw MapperException.chain(MapperMethod.decode, '($TResult)', e);
+      }
+    } else if (value is TResult) {
+      return value as TResult;
+    }
+
+    var mapper = _mapperForClassType(type, TClass);
+    if (mapper != null) {
+      return mapper.decodeValue<TResult>(
+          value, DecodingOptions(type: type), this);
+    } else {
+      throw MapperException.chain(
+          MapperMethod.decode, '($type)', MapperException.unknownType(type));
+    }
+  }
+
+  @override
   dynamic toValue<T>(T? value, [EncodingOptions? options]) {
     if (value == null) return null;
     var mapper = _mapperFor(value);
+    if (mapper != null) {
+      return mapper.encodeValue<T>(value, options, this);
+    } else {
+      throw MapperException.chain(
+        MapperMethod.encode,
+        '[$value]',
+        MapperException.unknownType(value.runtimeType),
+      );
+    }
+  }
+
+  @override
+  dynamic toClassValue<T, C>(T? value, [EncodingOptions? options]) {
+    if (value == null) return null;
+    if (C == Object) return toValue(value, options);
+
+    var mapper = _mapperForClass(value, C);
     if (mapper != null) {
       return mapper.encodeValue<T>(value, options, this);
     } else {
@@ -499,6 +611,26 @@ class _MapperContainerBase implements MapperContainer, TypeProvider {
     } else {
       return fallback();
     }
+  }
+
+  @override
+  void useForClass<C extends Object, T extends Object>(MapperBase<T> mapper) {
+    if (_mappersForClasses.containsKey(C)) {
+      _mappersForClasses[C]![T] = mapper;
+    } else {
+      _mappersForClasses[C] = <Type, MapperBase>{T: mapper};
+    }
+  }
+
+  @override
+  void useAllForClass<C extends Object>(Iterable<MapperBase> mappers) {
+    var mappersForClass = _mappersForClasses[C];
+    if (mappersForClass == null) {
+      mappersForClass = <Type, MapperBase>{};
+      _mappersForClasses[C] = mappersForClass;
+    }
+
+    mappersForClass.addEntries(mappers.map((m) => MapEntry(m.type, m)));
   }
 
   @override

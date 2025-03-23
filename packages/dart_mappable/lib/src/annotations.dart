@@ -20,6 +20,7 @@ class MappableClass extends MappableInterface {
     super.generateMethods,
     this.includeSubClasses,
     super.includeCustomMappers,
+    super.classLocalMappers,
     this.shallowEncoding,
     this.includeTypeId,
   }) : super._();
@@ -178,6 +179,7 @@ abstract class MappableInterface {
     this.hook,
     this.generateMethods,
     this.includeCustomMappers,
+    this.classLocalMappers,
   });
 
   /// The case style for the map keys.
@@ -213,6 +215,8 @@ abstract class MappableInterface {
   /// registered globally and available to all classes. This only makes sure
   /// that the needed mappers are registered before they are needed for this class.
   final Iterable<MapperBase>? includeCustomMappers;
+
+  final Iterable<MapperBase>? classLocalMappers;
 }
 
 /// Used to annotate a library to define default values.

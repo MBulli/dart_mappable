@@ -30,6 +30,9 @@ class TargetClassMapperElement extends ClassMapperElement
   late final String? customMappers =
       annotation.getPropertyNode('includeCustomMappers')?.toSource();
 
+  late final String? classLocalMappers =
+      annotation.getPropertyNode('classLocalMappers')?.toSource();
+
   late final List<String> customTypes = () {
     var types = <String>[];
 
